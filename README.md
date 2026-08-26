@@ -27,6 +27,38 @@ npm start
 
 服务默认监听 `3000` 端口，可通过 `PORT` 环境变量修改。
 
+## 🚀 部署到 Vercel
+
+本项目已内置完整的 Vercel Serverless 配置（`vercel.json` 及 `api/index.js`），支持一键部署到 Vercel：
+
+### 方式 1：使用内置部署脚本
+
+- **Windows PowerShell**:
+  ```powershell
+  .\deploy.ps1
+  # 或部署预览版：.\deploy.ps1 -Preview
+  ```
+- **macOS / Linux / Git Bash**:
+  ```bash
+  chmod +x deploy.sh
+  ./deploy.sh
+  # 或部署预览版：./deploy.sh --preview
+  ```
+
+### 方式 2：使用 npm 命令
+
+```bash
+# 部署到生产环境
+npm run deploy
+
+# 或部署预览环境
+npm run deploy:preview
+```
+
+### 方式 3：Git 关联部署
+
+直接将代码推送到 GitHub / GitLab 仓库，然后在 [Vercel 控制台](https://vercel.com/new) 点击 **Import** 即可零配置自动构建部署。
+
 ## API 端点与页面
 
 | 模块 | 端点 / 路径 | 方法 | 说明 |

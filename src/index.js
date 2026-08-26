@@ -53,21 +53,26 @@ app.get('/health', (_req, res) => {
 
 // ---- Start ----
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log();
-  console.log('  🤡 FakeAI 已启动 — 假的，都是假的');
-  console.log();
-  console.log(`  端口: ${PORT}`);
-  console.log();
-  console.log(`  OpenAI    →  POST http://localhost:${PORT}/v1/chat/completions`);
-  console.log(`  Responses →  POST http://localhost:${PORT}/v1/responses`);
-  console.log(`  Anthropic →  POST http://localhost:${PORT}/v1/messages`);
-  console.log(`  Gemini    →  POST http://localhost:${PORT}/v1beta/models/{model}:generateContent`);
-  console.log(`  Gemini 流 →  POST http://localhost:${PORT}/v1beta/models/{model}:streamGenerateContent`);
-  console.log();
-  console.log(`  管理页面  →  GET  http://localhost:${PORT}/vx/mg.html`);
-  console.log(`  管理 API  →  GET  http://localhost:${PORT}/vx/mgi`);
-  console.log();
-  console.log(`  健康检查  →  GET  http://localhost:${PORT}/health`);
-  console.log();
-});
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log();
+    console.log('  🤡 FakeAI 已启动 — 假的，都是假的');
+    console.log();
+    console.log(`  端口: ${PORT}`);
+    console.log();
+    console.log(`  OpenAI    →  POST http://localhost:${PORT}/v1/chat/completions`);
+    console.log(`  Responses →  POST http://localhost:${PORT}/v1/responses`);
+    console.log(`  Anthropic →  POST http://localhost:${PORT}/v1/messages`);
+    console.log(`  Gemini    →  POST http://localhost:${PORT}/v1beta/models/{model}:generateContent`);
+    console.log(`  Gemini 流 →  POST http://localhost:${PORT}/v1beta/models/{model}:streamGenerateContent`);
+    console.log();
+    console.log(`  管理页面  →  GET  http://localhost:${PORT}/vx/mg.html`);
+    console.log(`  管理 API  →  GET  http://localhost:${PORT}/vx/mgi`);
+    console.log();
+    console.log(`  健康检查  →  GET  http://localhost:${PORT}/health`);
+    console.log();
+  });
+}
+
+module.exports = app;

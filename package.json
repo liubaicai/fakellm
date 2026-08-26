@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "keywords": ["fake", "ai", "openai", "anthropic", "gemini", "sse", "mock"],
   "license": "MIT",

@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  THINKING,
+  randomThinking,
   randomResponse,
   generateId,
   generateFakeArgs,
@@ -22,9 +22,10 @@ router.post('/messages', async (req, res) => {
   const msgId = generateId('msg_');
   const useToolCall = shouldCallTool(tools);
   const thinkingEnabled = !!(thinking && thinking.type === 'enabled');
+  const thinkingText = randomThinking();
 
   if (!stream) {
-    return handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled });
+    return handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText });
   }
 
   // ---- Streaming (SSE) ----
@@ -65,8 +66,8 @@ router.post('/messages', async (req, res) => {
       content_block: { type: 'thinking', thinking: '' },
     });
 
-    for (const char of THINKING) {
-      await sleep(50);
+    for (const char of thinkingText) {
+      await sleep(10);
       sendEvent('content_block_delta', {
         type: 'content_block_delta',
         index: blockIndex,
@@ -143,12 +144,12 @@ router.post('/messages', async (req, res) => {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled }) {
+function handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText }) {
   const content = [];
 
   // thinking (if enabled)
   if (thinkingEnabled) {
-    content.push({ type: 'thinking', thinking: THINKING });
+    content.push({ type: 'thinking', thinking: thinkingText });
   }
 
   // text

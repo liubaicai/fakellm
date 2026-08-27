@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  THINKING,
+  randomThinking,
   randomResponse,
   generateId,
   generateFakeArgs,
@@ -21,13 +21,14 @@ router.post('/responses', async (req, res) => {
   const { model = 'fake-o3', stream = false, tools } = req.body;
   const respId = generateId('resp_');
   const created = Math.floor(Date.now() / 1000);
+  const thinkingText = randomThinking();
 
   // Normalize tools: Responses API tools have { type, name, parameters } at top level
   const functionTools = extractFunctionTools(tools);
   const useToolCall = shouldCallTool(functionTools);
 
   if (!stream) {
-    return handleNonStreaming(res, { respId, created, model, functionTools, useToolCall });
+    return handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText });
   }
 
   // ---- Streaming (SSE) ----
@@ -85,8 +86,8 @@ router.post('/responses', async (req, res) => {
   });
 
   // stream thinking char by char
-  for (const char of THINKING) {
-    await sleep(50);
+  for (const char of thinkingText) {
+    await sleep(10);
     sendEvent('response.reasoning_summary_text.delta', {
       item_id: reasoningId,
       output_index: outputIndex,
@@ -100,17 +101,17 @@ router.post('/responses', async (req, res) => {
     item_id: reasoningId,
     output_index: outputIndex,
     summary_index: 0,
-    text: THINKING,
+    text: thinkingText,
   });
 
   sendEvent('response.reasoning_summary_part.done', {
     item_id: reasoningId,
     output_index: outputIndex,
     summary_index: 0,
-    part: { type: 'summary_text', text: THINKING },
+    part: { type: 'summary_text', text: thinkingText },
   });
 
-  reasoningItem.summary = [{ type: 'summary_text', text: THINKING }];
+  reasoningItem.summary = [{ type: 'summary_text', text: thinkingText }];
   sendEvent('response.output_item.done', {
     output_index: outputIndex,
     item: reasoningItem,
@@ -282,14 +283,14 @@ async function streamFunctionCall(sendEvent, outputIndex, tools) {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { respId, created, model, functionTools, useToolCall }) {
+function handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText }) {
   const output = [];
 
   // Reasoning
   output.push({
     type: 'reasoning',
     id: generateId('rs_'),
-    summary: [{ type: 'summary_text', text: THINKING }],
+    summary: [{ type: 'summary_text', text: thinkingText }],
   });
 
   if (useToolCall) {

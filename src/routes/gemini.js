@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  THINKING,
+  randomThinking,
   MODELS,
   randomResponse,
   generateId,
@@ -45,12 +45,13 @@ router.post('/models/:modelAction', async (req, res) => {
 
   const tools = extractGeminiTools(req.body.tools);
   const useToolCall = shouldCallTool(tools);
+  const thinkingText = randomThinking();
 
   switch (action) {
     case 'generateContent':
-      return handleGenerateContent(res, { model, tools, useToolCall });
+      return handleGenerateContent(res, { model, tools, useToolCall, thinkingText });
     case 'streamGenerateContent':
-      return handleStreamGenerateContent(res, { model, tools, useToolCall });
+      return handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText });
     default:
       return res.status(400).json({ error: { message: `Unknown action: ${action}` } });
   }
@@ -73,8 +74,8 @@ function extractGeminiTools(tools) {
 // --------------------------------------------------
 // 非流式：generateContent
 // --------------------------------------------------
-function handleGenerateContent(res, { model, tools, useToolCall }) {
-  const parts = [{ thought: true, text: THINKING }];
+function handleGenerateContent(res, { model, tools, useToolCall, thinkingText }) {
+  const parts = [{ thought: true, text: thinkingText }];
 
   if (useToolCall) {
     const tool = selectRandomTool(tools);
@@ -104,7 +105,7 @@ function handleGenerateContent(res, { model, tools, useToolCall }) {
 // --------------------------------------------------
 // 流式：streamGenerateContent (SSE)
 // --------------------------------------------------
-async function handleStreamGenerateContent(res, { model, tools, useToolCall }) {
+async function handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText }) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -113,8 +114,8 @@ async function handleStreamGenerateContent(res, { model, tools, useToolCall }) {
   const sendData = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   // ---- Thinking ----
-  for (const char of THINKING) {
-    await sleep(50);
+  for (const char of thinkingText) {
+    await sleep(10);
     sendData({
       candidates: [
         {

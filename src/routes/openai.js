@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const {
-  THINKING,
+  randomThinking,
   MODELS,
   randomResponse,
   generateId,
@@ -39,9 +39,10 @@ router.post('/chat/completions', async (req, res) => {
   const id = generateId('chatcmpl-');
   const created = Math.floor(Date.now() / 1000);
   const useToolCall = shouldCallTool(tools);
+  const thinkingText = randomThinking();
 
   if (!stream) {
-    return handleNonStreaming(res, { id, created, model, tools, useToolCall });
+    return handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText });
   }
 
   // ---- Streaming (SSE) ----
@@ -65,7 +66,7 @@ router.post('/chat/completions', async (req, res) => {
   if (useToolCall) {
     await streamToolCall(send, chunk, tools);
   } else {
-    await streamThinkingAndContent(send, chunk);
+    await streamThinkingAndContent(send, chunk, thinkingText);
   }
 
   res.write('data: [DONE]\n\n');
@@ -75,7 +76,7 @@ router.post('/chat/completions', async (req, res) => {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { id, created, model, tools, useToolCall }) {
+function handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText }) {
   if (useToolCall) {
     const tool = selectRandomTool(tools);
     const func = tool.function || tool;
@@ -118,7 +119,7 @@ function handleNonStreaming(res, { id, created, model, tools, useToolCall }) {
         message: {
           role: 'assistant',
           content: randomResponse(),
-          reasoning_content: THINKING,
+          reasoning_content: thinkingText,
         },
         finish_reason: 'stop',
       },
@@ -130,10 +131,10 @@ function handleNonStreaming(res, { id, created, model, tools, useToolCall }) {
 // --------------------------------------------------
 // 流式：思考 + 内容
 // --------------------------------------------------
-async function streamThinkingAndContent(send, chunk) {
+async function streamThinkingAndContent(send, chunk, thinkingText) {
   // reasoning (thinking)
-  for (const char of THINKING) {
-    await sleep(50);
+  for (const char of thinkingText) {
+    await sleep(10);
     send(chunk({ reasoning_content: char }));
   }
 

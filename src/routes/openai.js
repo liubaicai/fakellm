@@ -7,7 +7,9 @@ const router = express.Router();
 const {
   randomThinking,
   MODELS,
-  randomResponse,
+  replyFor,
+  shouldFakeError,
+  randomFakeError,
   generateId,
   generateFakeArgs,
   shouldCallTool,
@@ -36,13 +38,28 @@ router.get('/models', (_req, res) => {
 // --------------------------------------------------
 router.post('/chat/completions', async (req, res) => {
   const { model = 'fake-gpt-4o', stream = false, tools } = req.body;
+
+  // 假报错：小概率直接返回 OpenAI 原生格式的假错误
+  if (shouldFakeError()) {
+    const { status, message } = randomFakeError();
+    return res.status(status).json({
+      error: {
+        message,
+        type: status === 429 ? 'insufficient_quota' : 'server_error',
+        code: status === 429 ? 'insufficient_quota' : null,
+        param: null,
+      },
+    });
+  }
+
   const id = generateId('chatcmpl-');
   const created = Math.floor(Date.now() / 1000);
   const useToolCall = shouldCallTool(tools);
   const thinkingText = randomThinking();
+  const reply = replyFor(req.body);
 
   if (!stream) {
-    return handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText });
+    return handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText, reply });
   }
 
   // ---- Streaming (SSE) ----
@@ -66,7 +83,7 @@ router.post('/chat/completions', async (req, res) => {
   if (useToolCall) {
     await streamToolCall(send, chunk, tools);
   } else {
-    await streamThinkingAndContent(send, chunk, thinkingText);
+    await streamThinkingAndContent(send, chunk, thinkingText, reply);
   }
 
   res.write('data: [DONE]\n\n');
@@ -76,7 +93,7 @@ router.post('/chat/completions', async (req, res) => {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText }) {
+function handleNonStreaming(res, { id, created, model, tools, useToolCall, thinkingText, reply }) {
   if (useToolCall) {
     const tool = selectRandomTool(tools);
     const func = tool.function || tool;
@@ -118,7 +135,7 @@ function handleNonStreaming(res, { id, created, model, tools, useToolCall, think
         index: 0,
         message: {
           role: 'assistant',
-          content: randomResponse(),
+          content: reply,
           reasoning_content: thinkingText,
         },
         finish_reason: 'stop',
@@ -131,7 +148,7 @@ function handleNonStreaming(res, { id, created, model, tools, useToolCall, think
 // --------------------------------------------------
 // 流式：思考 + 内容
 // --------------------------------------------------
-async function streamThinkingAndContent(send, chunk, thinkingText) {
+async function streamThinkingAndContent(send, chunk, thinkingText, reply) {
   // reasoning (thinking)
   for (const char of thinkingText) {
     await sleep(10);
@@ -139,7 +156,7 @@ async function streamThinkingAndContent(send, chunk, thinkingText) {
   }
 
   // content
-  const response = randomResponse();
+  const response = reply;
   for (const char of response) {
     await sleep(50);
     send(chunk({ content: char }));

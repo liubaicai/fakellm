@@ -6,7 +6,9 @@ const express = require('express');
 const router = express.Router();
 const {
   randomThinking,
-  randomResponse,
+  replyFor,
+  shouldFakeError,
+  randomFakeError,
   generateId,
   generateFakeArgs,
   shouldCallTool,
@@ -19,13 +21,22 @@ const {
 // --------------------------------------------------
 router.post('/messages', async (req, res) => {
   const { model = 'fake-claude', stream = false, tools, thinking } = req.body;
+
+  // 假报错：小概率直接返回原生格式的假错误（流式与非流式一致）
+  if (shouldFakeError()) {
+    const { status, message } = randomFakeError();
+    const type = status === 429 ? 'rate_limit_error' : status === 503 ? 'overloaded_error' : 'api_error';
+    return res.status(status).json({ type: 'error', error: { type, message } });
+  }
+
   const msgId = generateId('msg_');
   const useToolCall = shouldCallTool(tools);
   const thinkingEnabled = !!(thinking && thinking.type === 'enabled');
   const thinkingText = randomThinking();
+  const reply = replyFor(req.body);
 
   if (!stream) {
-    return handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText });
+    return handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText, reply });
   }
 
   // ---- Streaming (SSE) ----
@@ -80,7 +91,7 @@ router.post('/messages', async (req, res) => {
   }
 
   // ---- Text block ----
-  const response = randomResponse();
+  const response = reply;
   sendEvent('content_block_start', {
     type: 'content_block_start',
     index: blockIndex,
@@ -144,7 +155,7 @@ router.post('/messages', async (req, res) => {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText }) {
+function handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEnabled, thinkingText, reply }) {
   const content = [];
 
   // thinking (if enabled)
@@ -153,7 +164,7 @@ function handleNonStreaming(res, { msgId, model, tools, useToolCall, thinkingEna
   }
 
   // text
-  content.push({ type: 'text', text: randomResponse() });
+  content.push({ type: 'text', text: reply });
 
   // tool use
   if (useToolCall) {

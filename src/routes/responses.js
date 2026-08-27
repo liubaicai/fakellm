@@ -6,7 +6,9 @@ const express = require('express');
 const router = express.Router();
 const {
   randomThinking,
-  randomResponse,
+  replyFor,
+  shouldFakeError,
+  randomFakeError,
   generateId,
   generateFakeArgs,
   shouldCallTool,
@@ -19,16 +21,31 @@ const {
 // --------------------------------------------------
 router.post('/responses', async (req, res) => {
   const { model = 'fake-o3', stream = false, tools } = req.body;
+
+  // 假报错：小概率直接返回 OpenAI 原生格式的假错误
+  if (shouldFakeError()) {
+    const { status, message } = randomFakeError();
+    return res.status(status).json({
+      error: {
+        message,
+        type: status === 429 ? 'insufficient_quota' : 'server_error',
+        code: status === 429 ? 'insufficient_quota' : null,
+        param: null,
+      },
+    });
+  }
+
   const respId = generateId('resp_');
   const created = Math.floor(Date.now() / 1000);
   const thinkingText = randomThinking();
+  const reply = replyFor(req.body);
 
   // Normalize tools: Responses API tools have { type, name, parameters } at top level
   const functionTools = extractFunctionTools(tools);
   const useToolCall = shouldCallTool(functionTools);
 
   if (!stream) {
-    return handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText });
+    return handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText, reply });
   }
 
   // ---- Streaming (SSE) ----
@@ -43,7 +60,7 @@ router.post('/responses', async (req, res) => {
     res.write(`event: message\ndata: ${JSON.stringify(payload)}\n\n`);
   };
 
-  const response = randomResponse();
+  const response = reply;
 
   // Build the full response object for envelope events
   const buildResponseObj = (status, output = []) => ({
@@ -283,7 +300,7 @@ async function streamFunctionCall(sendEvent, outputIndex, tools) {
 // --------------------------------------------------
 // 非流式响应
 // --------------------------------------------------
-function handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText }) {
+function handleNonStreaming(res, { respId, created, model, functionTools, useToolCall, thinkingText, reply }) {
   const output = [];
 
   // Reasoning
@@ -310,7 +327,7 @@ function handleNonStreaming(res, { respId, created, model, functionTools, useToo
       id: generateId('msg_'),
       role: 'assistant',
       status: 'completed',
-      content: [{ type: 'output_text', text: randomResponse() }],
+      content: [{ type: 'output_text', text: reply }],
     });
   }
 

@@ -7,7 +7,9 @@ const router = express.Router();
 const {
   randomThinking,
   MODELS,
-  randomResponse,
+  replyFor,
+  shouldFakeError,
+  randomFakeError,
   generateId,
   generateFakeArgs,
   shouldCallTool,
@@ -43,15 +45,26 @@ router.post('/models/:modelAction', async (req, res) => {
   const model = req.params.modelAction.substring(0, colonIdx);
   const action = req.params.modelAction.substring(colonIdx + 1);
 
+  // 假报错：小概率直接返回 Gemini 原生格式的假错误
+  if (shouldFakeError()) {
+    const { status, message } = randomFakeError();
+    const statusText =
+      status === 429 ? 'RESOURCE_EXHAUSTED' :
+      status === 503 ? 'UNAVAILABLE' :
+      status === 400 ? 'INVALID_ARGUMENT' : 'INTERNAL';
+    return res.status(status).json({ error: { code: status, message, status: statusText } });
+  }
+
   const tools = extractGeminiTools(req.body.tools);
   const useToolCall = shouldCallTool(tools);
   const thinkingText = randomThinking();
+  const reply = replyFor(req.body);
 
   switch (action) {
     case 'generateContent':
-      return handleGenerateContent(res, { model, tools, useToolCall, thinkingText });
+      return handleGenerateContent(res, { model, tools, useToolCall, thinkingText, reply });
     case 'streamGenerateContent':
-      return handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText });
+      return handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText, reply });
     default:
       return res.status(400).json({ error: { message: `Unknown action: ${action}` } });
   }
@@ -74,7 +87,7 @@ function extractGeminiTools(tools) {
 // --------------------------------------------------
 // 非流式：generateContent
 // --------------------------------------------------
-function handleGenerateContent(res, { model, tools, useToolCall, thinkingText }) {
+function handleGenerateContent(res, { model, tools, useToolCall, thinkingText, reply }) {
   const parts = [{ thought: true, text: thinkingText }];
 
   if (useToolCall) {
@@ -82,7 +95,7 @@ function handleGenerateContent(res, { model, tools, useToolCall, thinkingText })
     const args = generateFakeArgs(tool.parameters);
     parts.push({ functionCall: { name: tool.name, args } });
   } else {
-    parts.push({ text: randomResponse() });
+    parts.push({ text: reply });
   }
 
   res.json({
@@ -105,7 +118,7 @@ function handleGenerateContent(res, { model, tools, useToolCall, thinkingText })
 // --------------------------------------------------
 // 流式：streamGenerateContent (SSE)
 // --------------------------------------------------
-async function handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText }) {
+async function handleStreamGenerateContent(res, { model, tools, useToolCall, thinkingText, reply }) {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -151,7 +164,7 @@ async function handleStreamGenerateContent(res, { model, tools, useToolCall, thi
       modelVersion: model,
     });
   } else {
-    const response = randomResponse();
+    const response = reply;
     for (const char of response) {
       await sleep(50);
       sendData({
